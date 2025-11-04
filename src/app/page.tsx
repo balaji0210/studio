@@ -1,36 +1,76 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { collection, Timestamp } from 'firebase/firestore';
 import { Header } from '@/components/Header';
 import { NewTaskForm } from '@/components/NewTaskForm';
 import { TaskList } from '@/components/TaskList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, Bell } from "lucide-react";
-import type { Task, Priority } from '@/lib/types';
+import { ArrowUpDown, Bell, Loader2 } from "lucide-react";
+import type { Task, Priority, FirestoreTask } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
+import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { doc } from 'firebase/firestore';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type SortOption = 'dueDate' | 'priority';
 const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
+function TaskSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-28 w-full" />
+      <Skeleton className="h-28 w-full" />
+      <Skeleton className="h-28 w-full" />
+    </div>
+  )
+}
+
 export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const firestore = useFirestore();
+
   const [sortOption, setSortOption] = useState<SortOption>('dueDate');
   const [alarmedTaskIds, setAlarmedTaskIds] = useState<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
+
+  // Automatically sign in users anonymously
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [isUserLoading, user, auth]);
+
+  const tasksQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, 'users', user.uid, 'tasks');
+  }, [firestore, user?.uid]);
+
+  const { data: firestoreTasks, isLoading: areTasksLoading } = useCollection<FirestoreTask>(tasksQuery);
+
+  const tasks: Task[] = useMemo(() => {
+    if (!firestoreTasks) return [];
+    return firestoreTasks.map(task => ({
+      ...task,
+      dueDate: task.dueDate.toDate(),
+      completedAt: task.completedAt?.toDate(),
+    }));
+  }, [firestoreTasks]);
 
   useEffect(() => {
     const alarmInterval = setInterval(() => {
       const now = new Date();
       tasks.forEach(task => {
         if (!task.completed && task.dueDate <= now && !alarmedTaskIds.has(task.id)) {
-          // Play sound
           audioRef.current?.play().catch(error => console.error("Audio play failed:", error));
           
-          // Show toast
           toast({
             title: "Task Due!",
             description: `Your task "${task.title}" is due now.`,
@@ -42,24 +82,23 @@ export default function Home() {
             ),
           });
 
-          // Add to alarmed list
           setAlarmedTaskIds(prev => new Set(prev).add(task.id));
         }
       });
     }, 1000); // Check every second
 
     const cleanupInterval = setInterval(() => {
-        const now = new Date();
-        setTasks(currentTasks => 
-            currentTasks.filter(task => {
-                if (task.completed && task.completedAt) {
-                    const timeSinceCompletion = now.getTime() - new Date(task.completedAt).getTime();
-                    return timeSinceCompletion < TWO_HOURS_IN_MS;
-                }
-                return true;
-            })
-        );
-    }, 60 * 1000); // Check every minute
+      const now = new Date();
+      tasks.forEach(task => {
+        if (task.completed && task.completedAt) {
+          const timeSinceCompletion = now.getTime() - new Date(task.completedAt).getTime();
+          if (timeSinceCompletion >= TWO_HOURS_IN_MS) {
+            // This part now needs to trigger a delete operation in Firestore.
+            // For simplicity, we will filter on the client for now. A better approach would be a Cloud Function.
+          }
+        }
+      });
+    }, 60 * 1000);
 
     return () => {
         clearInterval(alarmInterval);
@@ -67,28 +106,25 @@ export default function Home() {
     };
   }, [tasks, alarmedTaskIds, toast]);
 
-  const handleTaskCreate = (newTask: Task) => {
-    setTasks(prevTasks => [...prevTasks, newTask]);
-  };
-
   const handleToggleComplete = (id: string) => {
-    setTasks(tasks.map(task => {
-      if (task.id === id) {
-        const isCompleted = !task.completed;
-        return { 
-          ...task, 
-          completed: isCompleted,
-          completedAt: isCompleted ? new Date() : undefined
-        };
-      }
-      return task;
-    }));
-    // If a task is marked complete, we can remove it from the alarmed list
-    setAlarmedTaskIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
+    const task = tasks.find(t => t.id === id);
+    if (!task || !user?.uid || !firestore) return;
+
+    const isCompleted = !task.completed;
+    const taskRef = doc(firestore, 'users', user.uid, 'tasks', id);
+    
+    updateDocumentNonBlocking(taskRef, {
+      completed: isCompleted,
+      completedAt: isCompleted ? Timestamp.now() : null
     });
+    
+    if (isCompleted) {
+        setAlarmedTaskIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(id);
+            return newSet;
+        });
+    }
   };
 
   const priorityOrder: Record<Priority, number> = { high: 1, medium: 2, low: 3 };
@@ -107,9 +143,18 @@ export default function Home() {
       return 0;
     });
   }, [tasks, sortOption]);
+  
+  const visibleTasks = sortedTasks.filter(task => {
+      if (task.completed && task.completedAt) {
+          const now = new Date();
+          const timeSinceCompletion = now.getTime() - new Date(task.completedAt).getTime();
+          return timeSinceCompletion < TWO_HOURS_IN_MS;
+      }
+      return true;
+  });
 
-  const pendingTasks = sortedTasks.filter(task => !task.completed);
-  const completedTasks = sortedTasks.filter(task => task.completed);
+  const pendingTasks = visibleTasks.filter(task => !task.completed);
+  const completedTasks = visibleTasks.filter(task => task.completed);
   
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -118,6 +163,14 @@ export default function Home() {
   const todayTasks = pendingTasks.filter(task => task.dueDate.toDateString() === new Date().toDateString() && !task.completed);
   const upcomingTasks = pendingTasks.filter(task => new Date(task.dueDate) > todayStart && task.dueDate.toDateString() !== new Date().toDateString() && !task.completed);
 
+  if (isUserLoading) {
+    return (
+      <div className="flex min-h-screen w-full flex-col bg-background items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Loading Your Tasks...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -129,7 +182,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight">Your Tasks</h2>
             <p className="text-muted-foreground">Stay organized and productive.</p>
           </div>
-          <NewTaskForm onTaskCreate={handleTaskCreate} />
+          <NewTaskForm />
         </div>
 
         <Tabs defaultValue="pending" className="w-full">
@@ -152,43 +205,49 @@ export default function Home() {
             </DropdownMenu>
           </div>
           <TabsContent value="pending">
-            <div className="space-y-8">
-              {overdueTasks.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-destructive mb-2">Overdue</h3>
-                  <TaskList tasks={overdueTasks} onToggleComplete={handleToggleComplete} />
-                  <Separator className="my-6" />
-                </div>
-              )}
-              {todayTasks.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Today</h3>
-                  <TaskList tasks={todayTasks} onToggleComplete={handleToggleComplete} />
-                   {upcomingTasks.length > 0 && <Separator className="my-6" />}
-                </div>
-              )}
-              {upcomingTasks.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Upcoming</h3>
-                  <TaskList tasks={upcomingTasks} onToggleComplete={handleToggleComplete} />
-                </div>
-              )}
-              {pendingTasks.length === 0 && (
-                  <div className="flex flex-col items-center justify-center text-center py-16 border-2 border-dashed rounded-lg">
-                    <h3 className="text-xl font-semibold">All caught up!</h3>
-                    <p className="text-muted-foreground mt-2">No pending tasks. Create one to get started.</p>
+            {areTasksLoading ? <TaskSkeleton /> : (
+              <div className="space-y-8">
+                {overdueTasks.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-destructive mb-2">Overdue</h3>
+                    <TaskList tasks={overdueTasks} onToggleComplete={handleToggleComplete} />
+                    <Separator className="my-6" />
                   </div>
-              )}
-            </div>
+                )}
+                {todayTasks.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Today</h3>
+                    <TaskList tasks={todayTasks} onToggleComplete={handleToggleComplete} />
+                    {upcomingTasks.length > 0 && <Separator className="my-6" />}
+                  </div>
+                )}
+                {upcomingTasks.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Upcoming</h3>
+                    <TaskList tasks={upcomingTasks} onToggleComplete={handleToggleComplete} />
+                  </div>
+                )}
+                {pendingTasks.length === 0 && (
+                    <div className="flex flex-col items-center justify-center text-center py-16 border-2 border-dashed rounded-lg">
+                      <h3 className="text-xl font-semibold">All caught up!</h3>
+                      <p className="text-muted-foreground mt-2">No pending tasks. Create one to get started.</p>
+                    </div>
+                )}
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="completed">
-            {completedTasks.length > 0 ? (
-                <TaskList tasks={completedTasks} onToggleComplete={handleToggleComplete} />
-            ) : (
-                 <div className="flex flex-col items-center justify-center text-center py-16 border-2 border-dashed rounded-lg">
-                    <h3 className="text-xl font-semibold">No completed tasks yet.</h3>
-                    <p className="text-muted-foreground mt-2">Once you complete a task, it will show up here.</p>
-                  </div>
+            {areTasksLoading ? <TaskSkeleton /> : (
+              <>
+                {completedTasks.length > 0 ? (
+                    <TaskList tasks={completedTasks} onToggleComplete={handleToggleComplete} />
+                ) : (
+                    <div className="flex flex-col items-center justify-center text-center py-16 border-2 border-dashed rounded-lg">
+                      <h3 className="text-xl font-semibold">No completed tasks yet.</h3>
+                      <p className="text-muted-foreground mt-2">Once you complete a task, it will show up here.</p>
+                    </div>
+                )}
+              </>
             )}
           </TabsContent>
         </Tabs>

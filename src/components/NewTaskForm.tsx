@@ -11,6 +11,10 @@ import {
   Loader2
 } from "lucide-react";
 import React from "react";
+import { collection, Timestamp } from 'firebase/firestore';
+import { useAuth, useFirestore, useUser } from '@/firebase';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -43,7 +47,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { createTask } from "@/app/actions";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/lib/types";
 
@@ -58,14 +61,13 @@ const formSchema = z.object({
   reminder: z.boolean().default(false),
 });
 
-type NewTaskFormProps = {
-  onTaskCreate: (task: Task) => void;
-};
 
-export function NewTaskForm({ onTaskCreate }: NewTaskFormProps) {
+export function NewTaskForm() {
   const [open, setOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
+  const { user } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -79,36 +81,42 @@ export function NewTaskForm({ onTaskCreate }: NewTaskFormProps) {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore || !user) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "You must be logged in to create a task.",
+        });
+        return;
+    }
     setIsSubmitting(true);
     try {
       const [hours, minutes] = values.dueTime.split(':').map(Number);
       const combinedDueDate = new Date(values.dueDate);
       combinedDueDate.setHours(hours, minutes);
 
-      const newTask = await createTask({
-        ...values,
-        dueDate: combinedDueDate
-      });
+      const tasksCollection = collection(firestore, 'users', user.uid, 'tasks');
+      const newTaskData = {
+          userId: user.uid,
+          title: values.title,
+          description: values.description || "",
+          dueDate: Timestamp.fromDate(combinedDueDate),
+          priority: values.priority,
+          completed: false,
+          reminder: values.reminder,
+          createdAt: Timestamp.now(),
+      };
+      
+      addDocumentNonBlocking(tasksCollection, newTaskData);
 
-      onTaskCreate(newTask);
       toast({
         title: "Task Created",
-        description: `"${newTask.title}" has been added to your list.`,
+        description: `"${values.title}" has been added to your list.`,
       });
-      if (newTask.intelligentNotification) {
-        toast({
-            title: "Intelligent Reminder Set",
-            description: `We'll remind you at the optimal time!`,
-            action: (
-              <div className="flex items-center">
-                <Bell className="mr-2 h-4 w-4" />
-                <span>
-                  {format(new Date(newTask.intelligentNotification.time), "MMM d, p")}
-                </span>
-              </div>
-            ),
-        });
-      }
+
+      // AI reminder logic would be a bit different now, ideally a cloud function
+      // that triggers on document creation. For now, we'll disable the client-side toast for it.
+      
       setOpen(false);
       form.reset({ title: "", description: "", priority: "medium", reminder: false, dueTime: "17:00" });
     } catch (error) {

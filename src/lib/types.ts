@@ -1,16 +1,26 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export type Priority = "low" | "medium" | "high";
 
-export type Task = {
+export type BaseTask = {
   id: string;
   title: string;
   description?: string;
-  dueDate: Date;
   priority: Priority;
   completed: boolean;
-  completedAt?: Date;
   reminder?: boolean;
   intelligentNotification?: {
     time: string;
     message: string;
   };
+};
+
+export type Task = BaseTask & {
+  dueDate: Date;
+  completedAt?: Date;
+};
+
+export type FirestoreTask = BaseTask & {
+  dueDate: Timestamp;
+  completedAt?: Timestamp;
 };
