@@ -96,7 +96,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      <audio ref={audioRef} src="https://www.soundjay.com/buttons/beep-07a.mp3" preload="auto" />
+      <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto" />
       <Header />
       <main className="flex-1 p-4 md:p-8 container mx-auto">
         <div className="flex items-center justify-between mb-6">
