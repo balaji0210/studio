@@ -1,14 +1,74 @@
 {
   "entities": {
-    "Task": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Task",
+    "User": {
+      "title": "User",
       "type": "object",
-      "description": "Represents a task in the ChronoTask application.",
+      "description": "Represents a user of the application.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Task entity."
+          "description": "Unique identifier for the User (matches Firebase Auth UID)."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "URL of the user's profile picture."
+        }
+      },
+      "required": ["id", "email"]
+    },
+    "Project": {
+      "title": "Project",
+      "type": "object",
+      "description": "Represents a project, which is a container for tasks.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Project."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the project."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of the project."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns the project."
+        },
+        "memberIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of user UIDs who are members of this project."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the project was created."
+        }
+      },
+      "required": ["id", "name", "ownerId", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a single to-do item.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task."
         },
         "title": {
           "type": "string",
@@ -18,58 +78,174 @@
           "type": "string",
           "description": "Detailed description of the task."
         },
+        "completed": {
+          "type": "boolean",
+          "description": "Indicates whether the task is completed."
+        },
         "dueDate": {
           "type": "string",
-          "description": "Date and time when the task is due.",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Date and time when the task is due."
         },
         "priority": {
           "type": "string",
-          "description": "Priority level of the task (e.g., High, Medium, Low)."
+          "enum": ["low", "medium", "high"],
+          "description": "Priority level of the task."
         },
-        "completed": {
-          "type": "boolean",
-          "description": "Indicates whether the task is completed or not."
-        },
-        "userId": {
+        "creatorId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N Task)"
+          "description": "The UID of the user who created the task."
+        },
+        "assigneeId": {
+          "type": "string",
+          "description": "The UID of the user to whom the task is assigned."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "The ID of the project this task belongs to."
+        },
+        "tagIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of Tag IDs associated with this task."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the task was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the task was last updated."
         }
       },
-      "required": [
-        "id",
-        "title",
-        "dueDate",
-        "priority",
-        "completed",
-        "userId"
-      ]
+      "required": ["id", "title", "completed", "creatorId", "projectId", "createdAt", "updatedAt"]
     },
-    "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User",
+    "Tag": {
+      "title": "Tag",
       "type": "object",
-      "description": "Represents a user of the ChronoTask application.",
+      "description": "A label that can be applied to tasks for categorization.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the User entity."
-        },
-        "email": {
-          "type": "string",
-          "description": "Email address of the user.",
-          "format": "email"
+          "description": "Unique identifier for the Tag."
         },
         "name": {
           "type": "string",
-          "description": "Full name of the user."
+          "description": "The name of the tag (e.g., 'UI', 'Backend')."
+        },
+        "color": {
+          "type": "string",
+          "description": "A hex color code for the tag."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "The ID of the project this tag is scoped to."
         }
       },
-      "required": [
-        "id",
-        "email",
-        "name"
-      ]
+      "required": ["id", "name", "color", "projectId"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "type": "object",
+      "description": "A comment made on a task.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Comment."
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the comment."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "The UID of the user who wrote the comment."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the comment was created."
+        }
+      },
+      "required": ["id", "content", "authorId", "createdAt"]
+    },
+    "Attachment": {
+      "title": "Attachment",
+      "type": "object",
+      "description": "A file attached to a task.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Attachment."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "The original name of the uploaded file."
+        },
+        "fileUrl": {
+          "type": "string",
+          "description": "The Cloud Storage URL for the file."
+        },
+        "fileType": {
+          "type": "string",
+          "description": "The MIME type of the file."
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "File size in bytes."
+        },
+        "uploaderId": {
+          "type": "string",
+          "description": "The UID of the user who uploaded the file."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the file was uploaded."
+        }
+      },
+      "required": ["id", "fileName", "fileUrl", "fileType", "uploaderId", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "type": "object",
+      "description": "Records significant actions performed by users.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the log entry."
+        },
+        "actorId": {
+          "type": "string",
+          "description": "The UID of the user who performed the action."
+        },
+        "action": {
+          "type": "string",
+          "description": "The action performed (e.g., 'task.create', 'project.add_member')."
+        },
+        "entityId": {
+          "type": "string",
+          "description": "The ID of the entity that was affected."
+        },
+        "entityType": {
+          "type": "string",
+          "description": "The type of the entity (e.g., 'task', 'project')."
+        },
+        "details": {
+          "type": "object",
+          "description": "An object containing details about the change (e.g., before and after states)."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the action occurred."
+        }
+      },
+      "required": ["id", "actorId", "action", "entityId", "timestamp"]
     }
   },
   "auth": {
@@ -83,40 +259,52 @@
       {
         "path": "/users/{userId}",
         "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Collection of users.  User data is directly accessible by the user themselves.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
+          "schema": { "$ref": "#/entities/User" },
+          "description": "Stores public user profiles."
         }
       },
       {
-        "path": "/users/{userId}/tasks/{taskId}",
+        "path": "/projects/{projectId}",
         "definition": {
-          "entityName": "Task",
-          "schema": {
-            "$ref": "#/backend/entities/Task"
-          },
-          "description": "Collection of tasks owned by a specific user. The `userId` path parameter ensures tasks are scoped to the owning user, enabling simple, path-based security rules. Includes denormalized `userId` to enforce ownership.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user who owns the task."
-            },
-            {
-              "name": "taskId",
-              "description": "The unique identifier for the task."
-            }
-          ]
+          "schema": { "$ref": "#/entities/Project" },
+          "description": "Top-level collection for projects."
+        }
+      },
+      {
+        "path": "/tasks/{taskId}",
+        "definition": {
+          "schema": { "$ref": "#/entities/Task" },
+          "description": "Top-level collection for all tasks. This denormalized structure facilitates cross-project queries like 'tasks assigned to me'."
+        }
+      },
+      {
+        "path": "/tasks/{taskId}/comments/{commentId}",
+        "definition": {
+          "schema": { "$ref": "#/entities/Comment" },
+          "description": "Subcollection for comments on a specific task."
+        }
+      },
+      {
+        "path": "/tasks/{taskId}/attachments/{attachmentId}",
+        "definition": {
+          "schema": { "$ref": "#/entities/Attachment" },
+          "description": "Subcollection for attachments on a specific task."
+        }
+      },
+      {
+        "path": "/tags/{tagId}",
+        "definition": {
+          "schema": { "$ref": "#/entities/Tag" },
+          "description": "Top-level collection for tags, scoped by projectId within the document."
+        }
+      },
+      {
+        "path": "/auditLogs/{logId}",
+        "definition": {
+          "schema": { "$ref": "#/entities/AuditLog" },
+          "description": "Collection for all audit log entries across the application."
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to ensure security, scalability, and ease of debugging, adhering to the principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs. User and Task data are separated into collections that reflect their ownership. Each user has their own set of tasks located under `/users/{userId}/tasks/{taskId}`. This path-based ownership makes security rules straightforward because a user can only access data under their user ID. Authorization Independence is achieved as no `get()` calls are needed in security rules to validate ownership. A user's tasks are secured by only allowing reads/writes where `request.auth.uid == userId` in the path. The structure supports required QAPs (queries are predictable and secure) through structural segregation; listing tasks is secured based on the `userId` and enforced by path-based rules."
+    ]
   }
 }
