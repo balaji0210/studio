@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, isToday } from "date-fns";
 import { Bell, Flame, Snowflake, Zap } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,10 @@ const priorityMap: Record<Priority, { label: string, icon: React.FC<React.SVGPro
 export function TaskItem({ task, onToggleComplete }: TaskItemProps) {
     const priority = priorityMap[task.priority];
     const isOverdue = !task.completed && new Date() > task.dueDate;
+
+    const formattedDueDate = isToday(task.dueDate)
+        ? `Today at ${format(task.dueDate, 'p')}`
+        : format(task.dueDate, "MMMM d, yyyy");
 
     return (
         <motion.div
@@ -75,8 +79,8 @@ export function TaskItem({ task, onToggleComplete }: TaskItemProps) {
                     </div>
                 </CardHeader>
                 <CardFooter className="flex justify-between items-center text-sm text-muted-foreground">
-                    <div className={cn("font-medium", isOverdue ? "text-destructive" : "")}>
-                        {format(task.dueDate, "MMMM d, yyyy")} ({formatDistanceToNow(task.dueDate, { addSuffix: true })})
+                     <div className={cn("font-medium", isOverdue ? "text-destructive" : "")}>
+                        {formattedDueDate} ({formatDistanceToNow(task.dueDate, { addSuffix: true })})
                     </div>
                     {task.intelligentNotification && !task.completed && (
                         <TooltipProvider>
