@@ -1,5 +1,5 @@
 /**
- * @file Firestore Security Rules for ChronoTask Application
+ * @file Firestore Security Rules for Balaji's Personal Reminder App Application
  * @description This ruleset enforces a strict user-ownership model for tasks and user profiles.
  *
  * Data Structure:

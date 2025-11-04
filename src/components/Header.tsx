@@ -7,7 +7,7 @@ export function Header() {
         <div className="flex items-center gap-3">
           <ListChecks className="h-7 w-7 text-primary" />
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            ChronoTask
+            Balaji's Personal Reminder App
           </h1>
         </div>
       </div>

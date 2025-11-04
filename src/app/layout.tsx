@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'ChronoTask',
+  title: "Balaji's Personal Reminder App",
   description: 'A smart task management application.',
 };
 
