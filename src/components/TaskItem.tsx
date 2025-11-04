@@ -11,6 +11,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  CardContent,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -56,28 +57,27 @@ export function TaskItem({ task, onToggleComplete }: TaskItemProps) {
             )}>
                 <CardHeader className="pb-4">
                     <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <Checkbox
-                                id={`task-${task.id}`}
-                                checked={task.completed}
-                                onCheckedChange={() => onToggleComplete(task.id)}
-                                aria-label={`Mark task ${task.title} as ${task.completed ? 'incomplete' : 'complete'}`}
-                                className="mt-1.5 h-5 w-5 rounded-[4px]"
-                            />
-                            <div className="grid gap-1">
-                                <CardTitle className={cn("text-lg", task.completed && "line-through text-muted-foreground")}>
-                                    {task.title}
-                                </CardTitle>
-                                {task.description && <CardDescription className={cn("text-sm", task.completed && "line-through")}>{task.description}</CardDescription>}
-                            </div>
-                        </div>
-
+                        <CardTitle className={cn("text-lg", task.completed && "line-through text-muted-foreground")}>
+                            {task.title}
+                        </CardTitle>
                         <Badge variant="outline" className={cn("shrink-0", priority.className)}>
                             <priority.icon className="mr-1 h-3 w-3" />
                             {priority.label}
                         </Badge>
                     </div>
                 </CardHeader>
+                <CardContent className="pb-4 pt-0">
+                    <div className="flex items-start gap-4">
+                        <Checkbox
+                            id={`task-${task.id}`}
+                            checked={task.completed}
+                            onCheckedChange={() => onToggleComplete(task.id)}
+                            aria-label={`Mark task ${task.title} as ${task.completed ? 'incomplete' : 'complete'}`}
+                            className="mt-1 h-5 w-5 rounded-[4px]"
+                        />
+                        {task.description && <p className={cn("text-sm text-muted-foreground", task.completed && "line-through")}>{task.description}</p>}
+                    </div>
+                </CardContent>
                 <CardFooter className="flex justify-between items-center text-sm text-muted-foreground">
                      <div className={cn("font-medium", isOverdue ? "text-destructive" : "")}>
                         {formattedDueDate} ({formatDistanceToNow(task.dueDate, { addSuffix: true })})
