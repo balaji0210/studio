@@ -1,21 +1,54 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Header } from '@/components/Header';
 import { NewTaskForm } from '@/components/NewTaskForm';
 import { TaskList } from '@/components/TaskList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Bell } from "lucide-react";
 import type { Task, Priority } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from "@/hooks/use-toast";
 
 type SortOption = 'dueDate' | 'priority';
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('dueDate');
+  const [alarmedTaskIds, setAlarmedTaskIds] = useState<Set<string>>(new Set());
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      tasks.forEach(task => {
+        if (!task.completed && task.dueDate <= now && !alarmedTaskIds.has(task.id)) {
+          // Play sound
+          audioRef.current?.play().catch(error => console.error("Audio play failed:", error));
+          
+          // Show toast
+          toast({
+            title: "Task Due!",
+            description: `Your task "${task.title}" is due now.`,
+            action: (
+              <div className="flex items-center">
+                <Bell className="mr-2 h-4 w-4" />
+                <span>Time's up!</span>
+              </div>
+            ),
+          });
+
+          // Add to alarmed list
+          setAlarmedTaskIds(prev => new Set(prev).add(task.id));
+        }
+      });
+    }, 1000); // Check every second
+
+    return () => clearInterval(interval);
+  }, [tasks, alarmedTaskIds, toast]);
 
   const handleTaskCreate = (newTask: Task) => {
     setTasks(prevTasks => [...prevTasks, newTask]);
@@ -25,6 +58,12 @@ export default function Home() {
     setTasks(tasks.map(task => 
       task.id === id ? { ...task, completed: !task.completed } : task
     ));
+    // If a task is marked complete, we can remove it from the alarmed list
+    setAlarmedTaskIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+    });
   };
 
   const priorityOrder: Record<Priority, number> = { high: 1, medium: 2, low: 3 };
@@ -57,6 +96,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
+      <audio ref={audioRef} src="https://www.soundjay.com/buttons/beep-07a.mp3" preload="auto" />
       <Header />
       <main className="flex-1 p-4 md:p-8 container mx-auto">
         <div className="flex items-center justify-between mb-6">
