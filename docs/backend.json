@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task in the ChronoTask application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the task."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the task."
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Date and time when the task is due.",
+          "format": "date-time"
+        },
+        "priority": {
+          "type": "string",
+          "description": "Priority level of the task (e.g., High, Medium, Low)."
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Indicates whether the task is completed or not."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Task)"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "dueDate",
+        "priority",
+        "completed",
+        "userId"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the ChronoTask application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Collection of users.  User data is directly accessible by the user themselves.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Collection of tasks owned by a specific user. The `userId` path parameter ensures tasks are scoped to the owning user, enabling simple, path-based security rules. Includes denormalized `userId` to enforce ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user who owns the task."
+            },
+            {
+              "name": "taskId",
+              "description": "The unique identifier for the task."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure security, scalability, and ease of debugging, adhering to the principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs. User and Task data are separated into collections that reflect their ownership. Each user has their own set of tasks located under `/users/{userId}/tasks/{taskId}`. This path-based ownership makes security rules straightforward because a user can only access data under their user ID. Authorization Independence is achieved as no `get()` calls are needed in security rules to validate ownership. A user's tasks are secured by only allowing reads/writes where `request.auth.uid == userId` in the path. The structure supports required QAPs (queries are predictable and secure) through structural segregation; listing tasks is secured based on the `userId` and enforced by path-based rules."
+  }
+}
