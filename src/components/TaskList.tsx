@@ -10,10 +10,6 @@ type TaskListProps = {
 };
 
 export function TaskList({ tasks, onToggleComplete }: TaskListProps) {
-  if (tasks.length === 0) {
-    return null;
-  }
-
   return (
     <div className="space-y-4">
       <AnimatePresence>

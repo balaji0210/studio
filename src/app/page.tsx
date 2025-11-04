@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 
 type SortOption = 'dueDate' | 'priority';
+const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -22,7 +23,7 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const alarmInterval = setInterval(() => {
       const now = new Date();
       tasks.forEach(task => {
         if (!task.completed && task.dueDate <= now && !alarmedTaskIds.has(task.id)) {
@@ -47,7 +48,23 @@ export default function Home() {
       });
     }, 1000); // Check every second
 
-    return () => clearInterval(interval);
+    const cleanupInterval = setInterval(() => {
+        const now = new Date();
+        setTasks(currentTasks => 
+            currentTasks.filter(task => {
+                if (task.completed && task.completedAt) {
+                    const timeSinceCompletion = now.getTime() - new Date(task.completedAt).getTime();
+                    return timeSinceCompletion < TWO_HOURS_IN_MS;
+                }
+                return true;
+            })
+        );
+    }, 60 * 1000); // Check every minute
+
+    return () => {
+        clearInterval(alarmInterval);
+        clearInterval(cleanupInterval);
+    };
   }, [tasks, alarmedTaskIds, toast]);
 
   const handleTaskCreate = (newTask: Task) => {
@@ -55,9 +72,17 @@ export default function Home() {
   };
 
   const handleToggleComplete = (id: string) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+    setTasks(tasks.map(task => {
+      if (task.id === id) {
+        const isCompleted = !task.completed;
+        return { 
+          ...task, 
+          completed: isCompleted,
+          completedAt: isCompleted ? new Date() : undefined
+        };
+      }
+      return task;
+    }));
     // If a task is marked complete, we can remove it from the alarmed list
     setAlarmedTaskIds(prev => {
         const newSet = new Set(prev);
@@ -157,7 +182,14 @@ export default function Home() {
             </div>
           </TabsContent>
           <TabsContent value="completed">
-            <TaskList tasks={completedTasks} onToggleComplete={handleToggleComplete} />
+            {completedTasks.length > 0 ? (
+                <TaskList tasks={completedTasks} onToggleComplete={handleToggleComplete} />
+            ) : (
+                 <div className="flex flex-col items-center justify-center text-center py-16 border-2 border-dashed rounded-lg">
+                    <h3 className="text-xl font-semibold">No completed tasks yet.</h3>
+                    <p className="text-muted-foreground mt-2">Once you complete a task, it will show up here.</p>
+                  </div>
+            )}
           </TabsContent>
         </Tabs>
       </main>

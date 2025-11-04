@@ -7,6 +7,7 @@ export type Task = {
   dueDate: Date;
   priority: Priority;
   completed: boolean;
+  completedAt?: Date;
   reminder?: boolean;
   intelligentNotification?: {
     time: string;
