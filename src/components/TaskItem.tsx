@@ -29,9 +29,9 @@ type TaskItemProps = {
 };
 
 const priorityMap: Record<Priority, { label: string, icon: React.FC<React.SVGProps<SVGSVGElement>>, className: string }> = {
-    high: { label: 'High', icon: Flame, className: 'bg-red-500/90 text-red-50 border-red-600/50' },
-    medium: { label: 'Medium', icon: Zap, className: 'bg-yellow-500/90 text-yellow-50 border-yellow-600/50' },
-    low: { label: 'Low', icon: Snowflake, className: 'bg-blue-500/90 text-blue-50 border-blue-600/50' },
+    high: { label: 'High', icon: Flame, className: 'bg-red-500/20 text-red-400 border-red-500/20' },
+    medium: { label: 'Medium', icon: Zap, className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20' },
+    low: { label: 'Low', icon: Snowflake, className: 'bg-blue-500/20 text-blue-400 border-blue-500/20' },
 };
 
 export function TaskItem({ task, onToggleComplete }: TaskItemProps) {
@@ -51,8 +51,8 @@ export function TaskItem({ task, onToggleComplete }: TaskItemProps) {
             transition={{ type: "spring", stiffness: 260, damping: 20 }}
         >
             <Card className={cn(
-                "transition-all duration-300 hover:shadow-md",
-                task.completed ? "bg-card/60" : "bg-card",
+                "transition-all duration-300 hover:shadow-md hover:border-accent/50",
+                task.completed ? "bg-card/60 border-border/50" : "bg-card",
                 isOverdue && "border-destructive/50 shadow-lg shadow-destructive/10"
             )}>
                 <CardHeader className="pb-4">
