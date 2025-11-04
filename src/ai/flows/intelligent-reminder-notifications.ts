@@ -44,7 +44,10 @@ export async function intelligentReminderNotification(
 
 const prompt = ai.definePrompt({
   name: 'intelligentReminderPrompt',
-  input: {schema: IntelligentReminderInputSchema},
+  input: {schema: z.object({
+    ...IntelligentReminderInputSchema.shape,
+    now: z.string().describe("The current date and time in ISO format.")
+  })},
   output: {schema: IntelligentReminderOutputSchema},
   prompt: `You are an AI assistant designed to schedule task reminders for users. You will receive task details and user behavior data, and your goal is to determine the optimal notification time to maximize the likelihood of task completion.
 
